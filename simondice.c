@@ -1,12 +1,6 @@
-/*
- * simondice.c
- *
- * Created: 02/08/2021 08:37:33 p. m.
- * Author: Irving Aguilar
- */
-
 #include <mega328p.h>
 #include <delay.h>
+#include <stdlib.h>
 /*
 [START] CONSTANTS SECTION
 */
@@ -32,6 +26,8 @@ int velocidad = 500;
 const int NIVEL_MAX = 100;
 int secuencia[NIVEL_MAX];
 int secuenciaUsuario[NIVEL_MAX];
+int pausaEntreNotas;
+int i=0;
 /*
 [END] VARIABLES SECTION
 */
@@ -39,140 +35,26 @@ int secuenciaUsuario[NIVEL_MAX];
 [START] FUNCTIONS SECTION
 */
 // NOTA: Cambiar funcion
-void muestraSecuencia(){
-   digitalWrite(SALIDA_A, LOW);
-   digitalWrite(SALIDA_B, LOW);
-   digitalWrite(SALIDA_C, LOW);
-   digitalWrite(SALIDA_D, LOW);
-   for(int i = 0; i < nivelActual; i++){
-      if( secuencia[i] == SALIDA_A ){
-         tone(BUZZER, 200);
-         delay_ms(200);
-         noTone(BUZZER);
-      }
-      if( secuencia[i] == SALIDA_B ){
-         tone(BUZZER, 300);
-         delay_ms(200);
-         noTone(BUZZER);
-      }
-      if( secuencia[i] == SALIDA_C ){
-         tone(BUZZER, 400);
-         delay_ms(200);
-         noTone(BUZZER);
-      }
-      if( secuencia[i] == SALIDA_D ){
-         tone(BUZZER, 500);
-         delay_ms(200);
-         noTone(BUZZER);
-      }
-      digitalWrite(secuencia[i], HIGH);
-      delay_ms(velocidad);
-      digitalWrite(secuencia[i], LOW);
-      delay_ms(200);
-   }
+void tono (float frec)
+{
+    float Cuentas;
+    unsigned int CuentasEnt;
+    DDRB.1=1;
+    Cuentas=500000.0/frec;
+    CuentasEnt=Cuentas;
+    if ((Cuentas-CuentasEnt)>=0.5)
+        CuentasEnt++;
+        
+    TCCR1A=0x40;
+    TCCR1B=0x09;
+    OCR1AH=(CuentasEnt-1)/256;
+    OCR1AL=(CuentasEnt-1)%256;
 }
 
-
-
-void leeSecuencia(){
-   int flag = 0;
-   for(int i = 0; i < nivelActual; i++){
-      flag = 0;
-      while(flag == 0){
-         if(digitalRead(ENTRADA_D) == LOW){
-            digitalWrite(SALIDA_D, HIGH);
-            tone(BUZZER, 500);
-            delay_ms(300);
-            noTone(BUZZER);
-            secuenciaUsuario[i] = SALIDA_D;
-            flag = 1;
-            delay_ms(200);
-            if(secuenciaUsuario[i] != secuencia[i]){
-               secuenciaError();
-               return;
-            }
-            digitalWrite(SALIDA_D, LOW);
-         }
-         if(digitalRead(ENTRADA_C) == LOW){
-            digitalWrite(SALIDA_C, HIGH);
-            tone(BUZZER, 400);
-            delay_ms(300);
-            noTone(BUZZER);
-            secuenciaUsuario[i] = SALIDA_C;
-            flag = 1;
-            delay_ms(200);
-            if(secuenciaUsuario[i] != secuencia[i]){
-               secuenciaError();
-               return;
-            }
-            digitalWrite(SALIDA_C, LOW);
-         }
-         if(digitalRead(ENTRADA_B) == LOW){
-            digitalWrite(SALIDA_B, HIGH);
-            tone(BUZZER, 300);
-            delay_ms(300);
-            noTone(BUZZER);
-            secuenciaUsuario[i] = SALIDA_B;
-            flag = 1;
-            delay_ms(200);
-            if(secuenciaUsuario[i] != secuencia[i]){
-               secuenciaError();
-               return;
-            }
-            digitalWrite(SALIDA_B, LOW);
-         }
-         if(digitalRead(ENTRADA_A) == LOW){
-            digitalWrite(SALIDA_A, HIGH);
-            tone(BUZZER, 200);
-            delay_ms(300);
-            noTone(BUZZER);
-            secuenciaUsuario[i] = SALIDA_A;
-            flag = 1;
-            delay_ms(200);
-            if(secuenciaUsuario[i] != secuencia[i]){
-               secuenciaError();
-               return;
-            }
-            digitalWrite(SALIDA_A, LOW);
-         }
-      }
-   }
-   secuenciaCorrecta();
-}
-
-void generaSecuencia(){
-   randomSeed(millis());
-   for(int i = 0; i < NIVEL_MAX; i++){
-      secuencia[i] = random(2,6);
-   }
-}
-
-
-void melodiaError(){
-   for(int i = 0; i < 8; i++){
-      int duracionNota = 1000/duracionNotas[i];
-      tone(BUZZER, melodia[i],duracionNotas);
-      int pausaEntreNotas = duracionNota * 1.30;
-      delay_ms(pausaEntreNotas);
-      noTone(BUZZER);
-   }
-}
-
-
-void secuenciaError(){
-   digitalWrite(SALIDA_A, HIGH);
-   digitalWrite(SALIDA_B, HIGH);
-   digitalWrite(SALIDA_C, HIGH);
-   digitalWrite(SALIDA_D, HIGH);
-   delay_ms(250);
-   digitalWrite(SALIDA_A, LOW);
-   digitalWrite(SALIDA_B, LOW);
-   digitalWrite(SALIDA_C, LOW);
-   digitalWrite(SALIDA_D, LOW);
-   delay_ms(250);
-   melodiaError();
-   nivelActual = 1;
-   velocidad = 500;
+void noTono()
+{
+   TCCR1A=0;
+   TCCR1B=0; // stop
 }
 
 void secuenciaCorrecta(){
@@ -180,6 +62,142 @@ void secuenciaCorrecta(){
       nivelActual++;
    velocidad -= 50;
    delay_ms(200);
+}
+
+void melodiaError(){
+   for(i = 0; i < 8; i++){
+      int duracionNota = 1000/duracionNotas[i];
+      tono(melodia[i]);
+      pausaEntreNotas = duracionNota * 1.30;
+      delay_ms(pausaEntreNotas);
+      noTono();
+   }
+}
+
+void secuenciaError(){
+    PORTD.2=1;
+    PORTD.3=1;
+    PORTD.4=1;
+    PORTD.5=1;
+   delay_ms(250);
+    PORTD.2=0;
+    PORTD.3=0;
+    PORTD.4=0;
+    PORTD.5=0;
+   delay_ms(250);
+   melodiaError();
+   nivelActual = 1;
+   velocidad = 500;
+}
+
+void muestraSecuencia(){
+    PORTD.2=0;
+    PORTD.3=0;
+    PORTD.4=0;
+    PORTD.5=0;
+   for(i = 0; i < nivelActual; i++){
+    if( secuencia[i] == SALIDA_A ){
+         tono(200);
+         PORTD.2=1;
+         delay_ms(velocidad);
+         noTono(); 
+         PORTD.2=0;
+      }
+      if( secuencia[i] == SALIDA_B ){
+         tono(300);
+         PORTD.3=1;
+         delay_ms(velocidad);
+         noTono(); 
+         PORTD.3=0;
+      }
+      if( secuencia[i] == SALIDA_C ){
+         tono(400);
+         PORTD.4=1;
+         delay_ms(velocidad);
+         noTono(); 
+         PORTD.4=0;
+      }
+      if( secuencia[i] == SALIDA_D ){
+         tono(500);
+         PORTD.5=1;
+         delay_ms(velocidad);
+         noTono(); 
+         PORTD.5=0;
+      }
+   }
+}
+
+void leeSecuencia(){
+   int flag = 0;
+   for(i = 0; i < nivelActual; i++){
+      flag = 0;
+      while(flag == 0){
+         if(PINC.3 == 0){
+            PORTD.5=1;
+            tono(500);
+            delay_ms(300);
+            noTono();
+            secuenciaUsuario[i] = SALIDA_D;
+            flag = 1;
+            delay_ms(200);
+            if(secuenciaUsuario[i] != secuencia[i]){
+               secuenciaError();
+               return;
+            }
+            PORTD.5=0;
+         }
+         if(PINC.2 == 0){
+            PORTD.4=1;
+            tono(400);
+            delay_ms(300);
+            noTono();
+            secuenciaUsuario[i] = SALIDA_C;
+            flag = 1;
+            delay_ms(200);
+            if(secuenciaUsuario[i] != secuencia[i]){
+               secuenciaError();
+               return;
+            }
+            PORTD.4=0;
+         }
+         if(PINC.1 == 0){
+            PORTD.3=1;
+            tono(300);
+            delay_ms(300);
+            noTono();
+            secuenciaUsuario[i] = SALIDA_B;
+            flag = 1;
+            delay_ms(200);
+            if(secuenciaUsuario[i] != secuencia[i]){
+               secuenciaError();
+               return;
+            }
+            PORTD.3=0;
+         }
+         if(PINC.0 == 0){
+            PORTD.2=1;
+            tono(200);
+            delay_ms(300);
+            noTono();
+            secuenciaUsuario[i] = SALIDA_A;
+            flag = 1;
+            delay_ms(200);
+            if(secuenciaUsuario[i] != secuencia[i]){
+               secuenciaError();
+               return;
+            }
+            PORTD.2=0;
+         }
+      }
+   }
+   secuenciaCorrecta();
+}
+
+void generaSecuencia(){
+   srand(TCNT0);
+   for(i = 0; i < NIVEL_MAX; i++){
+      secuencia[i] = (rand()%(5-2+1))+2;
+   }
 }
 /*
 [END] FUNCTIONS SECTION
@@ -189,6 +207,7 @@ void main(void)
 PORTC = 0x0FF; // PC0 a PC7 con pull-up
 DDRB.1 = 1; // PB1 de salida para el buzzer
 DDRD=0x0FF;  // PD0 a PD7 de salida para LEDs
+TCCR0B=0x01; //Timer 0 a tiempo con CK
 while (1)
     {
     // Please write your application code here
